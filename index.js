@@ -29,10 +29,10 @@ app.post('/analyze-image', async (req, res) => {
           model: "gpt-4o-mini",
           messages: [
             {
-              role: "assistant",
+              role: "user",
               content: [
-                { type: "text", text: "Tell me about yourself" },
-                //{ type: "image_url", image_url: { url: imageBase64 } }
+                { type: "text", text: "How do I recycle this item?" },
+                { type: "image_url", image_url: { url: imageBase64 } }
               ]
             }
           ]

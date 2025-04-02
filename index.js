@@ -1,45 +1,54 @@
-// Import libraries
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
 
-// Initialize Express and OpenAI
 const app = express();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY, // Loads from .env file
-});
+//const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
+const openaiApiKey = process.env.OPENAI_KEY;
+app.use(cors());
+app.use(express.json());
 
-// Middleware
-app.use(cors()); // Allow requests from React Native
-app.use(express.json()); // Parse JSON bodies
-
-// Define the API endpoint
 app.post('/analyze-image', async (req, res) => {
   try {
     const { imageBase64 } = req.body;
 
-    // Call OpenAI GPT-4 Vision
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'How can I recycle this item? Suggest 3 methods.' },
-            { type: 'image_url', image_url: { url: imageBase64 } },
-          ],
-        },
-      ],
-    });
+    if (!imageBase64) {
+      return res.status(400).json({ error: 'No image provided' });
+    }
 
-    // Send the AI's response back to React Native
-    res.json({ result: response.choices[0].message.content });
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "How can I recycle this item?" },
+                { type: "image_url", image_url: { url: imageBase64 } }
+              ]
+            }
+          ]
+        })
+      });
+
+    res.json({ result: response.data });
   } catch (error) {
-    console.error(error);
+    console.error('Error analyzing image:', error);
     res.status(500).json({ error: 'AI analysis failed' });
   }
 });
+
+app.listen(3000, () => {
+  console.log('Backend running on http://localhost:3000');
+});
+
 
 // Start the server
 const PORT = 3000;

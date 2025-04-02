@@ -7,7 +7,8 @@ const app = express();
 //const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
 const openaiApiKey = process.env.OPENAI_KEY;
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.post('/analyze-image', async (req, res) => {
   try {
@@ -28,27 +29,24 @@ app.post('/analyze-image', async (req, res) => {
           model: "gpt-4o-mini",
           messages: [
             {
-              role: "user",
+              role: "assistant",
               content: [
-                { type: "text", text: "How can I recycle this item?" },
-                { type: "image_url", image_url: { url: imageBase64 } }
+                { type: "text", text: "Tell me about yourself" },
+                //{ type: "image_url", image_url: { url: imageBase64 } }
               ]
             }
           ]
         })
       });
-
-    res.json({ result: response.data });
+    
+    const data = await response.json(); // This line is missing
+    console.log(data);
+    res.json({ result: data }); // Use the parsed data, not response.data
   } catch (error) {
     console.error('Error analyzing image:', error);
     res.status(500).json({ error: 'AI analysis failed' });
   }
 });
-
-app.listen(3000, () => {
-  console.log('Backend running on http://localhost:3000');
-});
-
 
 // Start the server
 const PORT = 3000;

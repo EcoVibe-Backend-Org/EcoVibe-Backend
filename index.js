@@ -4,8 +4,8 @@ const cors = require('cors');
 const OpenAI = require('openai');
 
 const app = express();
-//const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
-const openaiApiKey = process.env.OPENAI_KEY;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -13,38 +13,56 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.post('/analyze-image', async (req, res) => {
   try {
     const { imageBase64 } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: 'No image provided' });
 
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'No image provided' });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      stream: true,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { 
+              type: "text", 
+              text: "Using Egypt's recycling guidelines: Identify the item's material and explain its recycling process. " +
+                    "Conclude with '[END]' when finished. Strict 300-word limit."
+            },
+            { type: "image_url", image_url: { url: imageBase64 } }
+          ]
+        }
+      ],
+      max_tokens: 400,
+      stop: ["[END]"]
+    });
+
+    let finalChunkSent = false;
+    for await (const chunk of stream) {
+      if (finalChunkSent) break;
+      
+      const textChunk = chunk.choices?.[0]?.delta?.content || "";
+      const endIndex = textChunk.indexOf('[END]');
+      
+      if (endIndex > -1) {
+        // Send final chunk without [END] marker
+        res.write(`data: ${JSON.stringify({ chunk: textChunk.substring(0, endIndex) })}\n\n`);
+        finalChunkSent = true;
+      } else {
+        res.write(`data: ${JSON.stringify({ chunk: textChunk })}\n\n`);
+      }
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${openaiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "How do I recycle this item?" },
-                { type: "image_url", image_url: { url: imageBase64 } }
-              ]
-            }
-          ]
-        })
-      });
-    
-    const data = await response.json(); // This line is missing
-    console.log(data);
-    res.json({ result: data }); // Use the parsed data, not response.data
+    // Explicit termination message
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
   } catch (error) {
     console.error('Error analyzing image:', error);
-    res.status(500).json({ error: 'AI analysis failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'AI analysis failed: ' + error.message });
+    }
   }
 });
 

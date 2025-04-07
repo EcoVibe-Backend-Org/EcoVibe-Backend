@@ -21,7 +21,7 @@ app.post("/analyze-image", async (req, res) => {
     res.setHeader("Connection", "keep-alive");
 
     const stream = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4o-mini",
       stream: true,
       messages: [
         {

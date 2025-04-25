@@ -90,7 +90,7 @@ app.post("/analyze-image", async (req, res) => {
     const AIimageClassifier = require('./models/AIimageClassifier'); // Adjust path as needed
     
     const newClassification = new AIimageClassifier({
-      userID: userID,
+      userID: "userID",
       image: imageBase64,
       response: fullResponse,
       gptModel: gptModel,

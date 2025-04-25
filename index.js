@@ -29,9 +29,9 @@ app.post("/analyze-image", async (req, res) => {
     const { imageBase64 } = req.body;
     if (!imageBase64)
       return res.status(400).json({ error: "No image provided" });
-
+    const userID = req.user._id;
     // Get user ID from authenticated session (assuming authentication middleware)
-    const userID = req.user._id; // Adjust based on your auth implementation
+    
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -90,7 +90,7 @@ app.post("/analyze-image", async (req, res) => {
     const AIimageClassifier = require('./models/AIimageClassifier'); // Adjust path as needed
     
     const newClassification = new AIimageClassifier({
-      userID: "userID",
+      userID: userID,
       image: imageBase64,
       response: fullResponse,
       gptModel: gptModel,
@@ -100,11 +100,11 @@ app.post("/analyze-image", async (req, res) => {
     // Save to database
     await newClassification.save();
     
-    // Send the document ID back to client for future reference (rating updates)
-    res.write(`data: ${JSON.stringify({ 
-      done: true,
-      classificationId: newClassification._id 
-    })}\n\n`);
+    // // Send the document ID back to client for future reference (rating updates)
+    // res.write(`data: ${JSON.stringify({ 
+    //   done: true,
+    //   classificationId: newClassification._id 
+    // })}\n\n`);
     
     res.end();
   } catch (error) {

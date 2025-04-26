@@ -15,6 +15,10 @@ const postSchema = mongoose.Schema(
             type: String,
             required: true,
         },
+        attachments: {
+            type: [String],
+            default: []
+        }
     },
     { timestamps: true }
 );

@@ -6,7 +6,7 @@ const Post = require("../models/post");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-
+const User = require("../models/user");
 // Set up multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {

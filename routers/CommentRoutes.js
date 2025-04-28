@@ -4,7 +4,7 @@ const asyncHandler = require("express-async-handler");
 const { protect } = require("../middleware/auth");
 const Comment = require("../models/comment");
 const Post = require("../models/post");
-
+const User = require("../models/user");
 // CREATE comment or reply
 const createComment = asyncHandler(async (req, res) => {
     const { postId, content, parentId } = req.body;

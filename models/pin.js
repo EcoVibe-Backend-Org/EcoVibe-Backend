@@ -2,11 +2,7 @@ const mongoose = require("mongoose");
 
 const pinSchema = mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: [true, "Please add a name"],
-      trim: true,
-    },
+    name: { type: String, required: [true, "Please add a name"], trim: true },
     location: {
       type: {
         type: String,
@@ -17,22 +13,24 @@ const pinSchema = mongoose.Schema(
         type: [Number],
         required: true,
         validate: {
-          // Ensure array has exactly two elements
           validator: (arr) => arr.length === 2,
           message: "Coordinates must be [lng, lat]",
         },
       },
     },
-    icon: {
+    type: {
       type: String,
-      default: "./assets/default-icon.png",
+      enum: ["Recycling Bin", "Recycling Vendor", "Community Drop-off"],
+      required: true,
     },
+    description: { type: String, default: "" },
+    acceptedMaterials: { type: [String], default: [] },
+    icon: { type: String, default: "./assets/default-icon.png" },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 pinSchema.index({ location: "2dsphere" });
 const Pin = mongoose.model("Pin", pinSchema);
+
 module.exports = Pin;

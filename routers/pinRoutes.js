@@ -17,6 +17,9 @@ router.put("/update/:id", pinController.updatePin);
 // Delete a pin by ID
 router.delete("/delete/:id", pinController.deletePin);
 
+// Filter pins based on criteria
+router.post("/get/filtered", pinController.getFilteredPins);
+
 module.exports = router;
 // This code defines the routes for the pin-related operations in an Express application.
 // It includes routes for creating, retrieving, updating, and deleting pins.

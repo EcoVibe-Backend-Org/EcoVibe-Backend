@@ -15,7 +15,7 @@ app.use("/api/posts", require("./routers/postRoutes"))
 const mongoose = require("mongoose")
 
 const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static('uploads'));
 
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
 .then((result) => {

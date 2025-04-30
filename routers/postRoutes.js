@@ -91,7 +91,16 @@ const updatePost = asyncHandler(async (req, res) => {
 
   // Replace attachments if provided
   if (attachments && Array.isArray(attachments)) {
-    post.attachments = attachments.map((att, idx) => {
+    processedAttachments = attachments.map((att, idx) => {
+      // If att is an object with data, mimetype, filename
+      if (typeof att === 'object' && att.data && att.mimetype) {
+        return {
+          filename: att.filename || `attachment_${Date.now()}_${idx}`,
+          data: att.data,
+          mimetype: att.mimetype,
+        };
+      }
+      // Fallback: try parsing as Data URI string
       const base64Obj = parseBase64DataUri(att);
       if (!base64Obj) {
         throw new Error("Invalid base64 attachment format");
@@ -103,6 +112,7 @@ const updatePost = asyncHandler(async (req, res) => {
       };
     });
   }
+  
 
   const updatedPost = await post.save();
   res.status(200).json(updatedPost);

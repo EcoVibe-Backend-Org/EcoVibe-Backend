@@ -85,27 +85,37 @@ const updateComment = asyncHandler(async (req, res) => {
     res.status(200).json(updated);
 });
 
-// DELETE comment (and its replies)
-const deleteComment = asyncHandler(async (req, res) => {
+const deleteCommentAndReplies = async (commentId) => {
+    const replies = await Comment.find({ parent: commentId });
+    for (const reply of replies) {
+      await deleteCommentAndReplies(reply._id);
+    }
+    await Comment.deleteOne({ _id: commentId });
+  };
+  
+  const deleteComment = asyncHandler(async (req, res) => {
     const comment = await Comment.findById(req.params.id);
-
+  
     if (!comment) {
-        res.status(404).json("Comment not found.");
-        return;
+      res.status(404).json("Comment not found.");
+      return;
     }
-
+  
     if (comment.user.toString() !== req.user._id.toString()) {
-        res.status(401).json("Not authorized to delete this comment.");
-        return;
+      res.status(401).json("Not authorized to delete this comment.");
+      return;
     }
-
-    // Delete all replies
-    await Comment.deleteMany({ parent: comment._id });
-
-    // Delete the main comment
-    await comment.remove();
+  
+    await deleteCommentAndReplies(comment._id);
+  
+    // Remove from post's comments array
+    await Post.findByIdAndUpdate(comment.post, {
+      $pull: { comments: comment._id }
+    });
+  
     res.status(200).json({ message: "Comment and replies deleted" });
-});
+  });
+  
 
 // Routes
 router.post("/", protect, createComment);

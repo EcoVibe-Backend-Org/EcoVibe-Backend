@@ -11,26 +11,27 @@ exports.validatePinData = (data) => {
     return { error: "Please add a name" };
   }
 
+  // FIXED location check 👇
   if (
     !location ||
-    !Array.isArray(location) ||
-    location.length !== 2 ||
-    typeof location[0] !== "number" ||
-    typeof location[1] !== "number"
+    typeof location !== "object" ||
+    location.type !== "Point" ||
+    !Array.isArray(location.coordinates) ||
+    location.coordinates.length !== 2 ||
+    typeof location.coordinates[0] !== "number" ||
+    typeof location.coordinates[1] !== "number"
   ) {
-    return { error: "Please add a valid location (array: [lng, lat])" };
+    return { error: "Please add a valid location (GeoJSON: {type: 'Point', coordinates: [lng, lat]})" };
   }
 
   if (!type || !VALID_TYPES.includes(type)) {
     return { error: `Type must be one of: ${VALID_TYPES.join(", ")}` };
   }
 
-  // description is optional, but if present must be a string (optional)
   if (description && typeof description !== "string") {
     return { error: "Description must be a string" };
   }
 
-  // acceptedMaterials is optional but if present must be an array of strings
   if (
     acceptedMaterials &&
     (!Array.isArray(acceptedMaterials) ||
@@ -39,7 +40,6 @@ exports.validatePinData = (data) => {
     return { error: "Accepted materials must be an array of strings" };
   }
 
-  // icon is optional, but if present must be a string (optional)
   if (icon && typeof icon !== "string") {
     return { error: "Icon must be a string" };
   }

@@ -30,29 +30,31 @@ const CreatePost = asyncHandler(async (req, res) => {
   }
 
   // Validate and process attachments
-  let processedAttachments = [];
-  if (attachments && Array.isArray(attachments)) {
-    processedAttachments = attachments.map((att, idx) => {
-      if (att && typeof att === "object" && att.data && att.mimetype) {
-        return {
-          filename: att.filename || `attachment_${Date.now()}_${idx}`,
-          data: att.data,
-          mimetype: att.mimetype,
-        };
-      }
-      // Else, try to parse as Data URI string
-      const base64Obj = parseBase64DataUri(att);
-      if (!base64Obj) {
-        throw new Error("Invalid base64 attachment format");
-      }
+// Validate and process attachments
+let processedAttachments = [];
+if (attachments && Array.isArray(attachments)) {
+  processedAttachments = attachments.map((att, idx) => {
+    // If already an object with data and mimetype, use it directly
+    if (att && typeof att === "object" && att.data && att.mimetype) {
       return {
-        filename: `attachment_${Date.now()}_${idx}`,
-        data: base64Obj.data,
-        mimetype: base64Obj.mimetype,
+        filename: att.filename || `attachment_${Date.now()}_${idx}`,
+        data: att.data,
+        mimetype: att.mimetype,
       };
-    });
-    post.attachments = processedAttachments;
-  }
+    }
+    // Else, try to parse as Data URI string
+    const base64Obj = parseBase64DataUri(att);
+    if (!base64Obj) {
+      throw new Error("Invalid base64 attachment format");
+    }
+    return {
+      filename: `attachment_${Date.now()}_${idx}`,
+      data: base64Obj.data,
+      mimetype: base64Obj.mimetype,
+    };
+  });
+}
+
   
 
   const post = await Post.create({
@@ -99,7 +101,6 @@ const updatePost = asyncHandler(async (req, res) => {
   post.title = title || post.title;
   post.content = content || post.content;
 
-  // Replace attachments if provided
     // Validate and process attachments
     let processedAttachments = [];
     if (attachments && Array.isArray(attachments)) {
@@ -124,6 +125,7 @@ const updatePost = asyncHandler(async (req, res) => {
         };
     });
     }
+
 
 
   const updatedPost = await post.save();

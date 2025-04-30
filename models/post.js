@@ -1,5 +1,11 @@
 const mongoose = require("mongoose");
 
+const attachmentSchema = new mongoose.Schema({
+    filename: { type: String, required: true },
+    data: { type: String, required: true },      // base64 string
+    mimetype: { type: String, required: true }
+}, { _id: false });
+
 const postSchema = mongoose.Schema(
     {
         user: {
@@ -16,7 +22,7 @@ const postSchema = mongoose.Schema(
             required: true,
         },
         attachments: {
-            type: [String],
+            type: [attachmentSchema],
             default: []
         }
     },

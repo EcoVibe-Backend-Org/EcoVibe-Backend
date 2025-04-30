@@ -39,37 +39,37 @@ const upload = multer({
 
 // Create Post with attachments
 const CreatePost = asyncHandler(async (req, res) => {
-    const { title, content } = req.body;
-
+    const { title, content, attachments } = req.body;
+  
     if (!title || !content) {
-        res.status(400).json("Title and content are required.");
-        return;
+      return res.status(400).json("Title and content are required.");
     }
-
+  
     const userExists = await User.findById(req.user._id);
     if (!userExists) {
-        res.status(404).json("User not found.");
-        return;
+      return res.status(404).json("User not found.");
     }
-
-    // Process file attachments
-    const attachmentPaths = [];
-    if (req.files && req.files.length > 0) {
-        req.files.forEach(file => {
-            // Store the file path or URL
-            attachmentPaths.push(`/uploads/${file.filename}`);
-        });
+  
+    // Validate attachments (optional)
+    let processedAttachments = [];
+    if (attachments && Array.isArray(attachments)) {
+      processedAttachments = attachments.map(att => ({
+        filename: att.filename,
+        data: att.data, // base64 string
+        mimetype: att.mimetype
+      }));
     }
-
+  
     const post = await Post.create({
-        user: req.user._id,
-        title,
-        content,
-        attachments: attachmentPaths
+      user: req.user._id,
+      title,
+      content,
+      attachments: processedAttachments
     });
-
+  
     res.status(201).json(post);
-});
+  });
+  
 
 // Read All Posts
 const Read_All_Post = asyncHandler(async (req, res) => {

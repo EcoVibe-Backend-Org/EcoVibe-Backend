@@ -3,182 +3,134 @@ const router = express.Router();
 const asyncHandler = require("express-async-handler");
 const { protect } = require("../middleware/auth");
 const Post = require("../models/post");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 const User = require("../models/user");
-// Set up multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadDir = 'uploads/';
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
-});
 
-const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-    fileFilter: function (req, file, cb) {
-        // Accept images, PDFs, and common document formats
-        const filetypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb(new Error("Only supported file formats allowed!"));
-    }
-});
+// Helper: Validate base64 Data URI
+function parseBase64DataUri(dataUri) {
+  // Example: data:image/png;base64,iVBORw0KGgo...
+  const matches = dataUri.match(/^data:([a-zA-Z0-9\/\-\+\.]+);base64,(.+)$/);
+  if (!matches) return null;
+  return {
+    mimetype: matches[1],
+    data: matches[2],
+  };
+}
 
-// Create Post with attachments
+// Create Post
 const CreatePost = asyncHandler(async (req, res) => {
-    const { title, content, attachments } = req.body;
-  
-    if (!title || !content) {
-      return res.status(400).json("Title and content are required.");
-    }
-  
-    const userExists = await User.findById(req.user._id);
-    if (!userExists) {
-      return res.status(404).json("User not found.");
-    }
-  
-    // Validate attachments (optional)
-    let processedAttachments = [];
-    if (attachments && Array.isArray(attachments)) {
-      processedAttachments = attachments.map(att => ({
-        filename: att.filename,
-        data: att.data, // base64 string
-        mimetype: att.mimetype
-      }));
-    }
-  
-    const post = await Post.create({
-      user: req.user._id,
-      title,
-      content,
-      attachments: processedAttachments
+  const { title, content, attachments } = req.body;
+
+  if (!title || !content) {
+    return res.status(400).json("Title and content are required.");
+  }
+
+  const userExists = await User.findById(req.user._id);
+  if (!userExists) {
+    return res.status(404).json("User not found.");
+  }
+
+  // Validate and process attachments
+  let processedAttachments = [];
+  if (attachments && Array.isArray(attachments)) {
+    processedAttachments = attachments.map((att, idx) => {
+      const base64Obj = parseBase64DataUri(att);
+      if (!base64Obj) {
+        throw new Error("Invalid base64 attachment format");
+      }
+      return {
+        filename: `attachment_${Date.now()}_${idx}`,
+        data: base64Obj.data,
+        mimetype: base64Obj.mimetype,
+      };
     });
-  
-    res.status(201).json(post);
+  }
+
+  const post = await Post.create({
+    user: req.user._id,
+    title,
+    content,
+    attachments: processedAttachments,
   });
-  
+
+  res.status(201).json(post);
+});
 
 // Read All Posts
 const Read_All_Post = asyncHandler(async (req, res) => {
-    const posts = await Post.find().populate("user", "username");
-    res.status(200).json(posts);
+  const posts = await Post.find().populate("user", "username");
+  res.status(200).json(posts);
 });
 
 // Read Single Post
 const Read_Single_Post = asyncHandler(async (req, res) => {
-    const post = await Post.findById(req.params.id).populate("user", "username");
-
-    if (!post) {
-        res.status(404).json("Post not found.");
-        return;
-    }
-
-    res.status(200).json(post);
+  const post = await Post.findById(req.params.id).populate("user", "username");
+  if (!post) {
+    res.status(404).json("Post not found.");
+    return;
+  }
+  res.status(200).json(post);
 });
 
-// Update Post with attachments
+// Update Post
 const updatePost = asyncHandler(async (req, res) => {
-    const { title, content } = req.body;
+  const { title, content, attachments } = req.body;
+  const post = await Post.findById(req.params.id);
 
-    const post = await Post.findById(req.params.id);
+  if (!post) {
+    res.status(404).json("Post not found.");
+    return;
+  }
 
-    if (!post) {
-        res.status(404).json("Post not found.");
-        return;
-    }
+  if (post.user.toString() !== req.user._id.toString()) {
+    res.status(401).json("Not authorized to update this post.");
+    return;
+  }
 
-    if (post.user.toString() !== req.user._id.toString()) {
-        res.status(401).json("Not authorized to update this post.");
-        return;
-    }
+  post.title = title || post.title;
+  post.content = content || post.content;
 
-    post.title = title || post.title;
-    post.content = content || post.content;
+  // Replace attachments if provided
+  if (attachments && Array.isArray(attachments)) {
+    post.attachments = attachments.map((att, idx) => {
+      const base64Obj = parseBase64DataUri(att);
+      if (!base64Obj) {
+        throw new Error("Invalid base64 attachment format");
+      }
+      return {
+        filename: `attachment_${Date.now()}_${idx}`,
+        data: base64Obj.data,
+        mimetype: base64Obj.mimetype,
+      };
+    });
+  }
 
-    // Process new attachments if any
-    if (req.files && req.files.length > 0) {
-        const newAttachments = req.files.map(file => `/uploads/${file.filename}`);
-        
-        // If removeAttachments is provided in the request, remove those attachments
-        if (req.body.removeAttachments) {
-            const attachmentsToRemove = JSON.parse(req.body.removeAttachments);
-            
-            // Remove files from storage
-            attachmentsToRemove.forEach(attachmentPath => {
-                try {
-                    const filePath = path.join(__dirname, '..', attachmentPath);
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                } catch (error) {
-                    console.error("Error removing file:", error);
-                }
-            });
-            
-            // Filter out removed attachments
-            post.attachments = post.attachments.filter(
-                attachment => !attachmentsToRemove.includes(attachment)
-            );
-        }
-        
-        // Add new attachments
-        post.attachments = [...post.attachments, ...newAttachments];
-    }
-
-    const updatedPost = await post.save();
-    res.status(200).json(updatedPost);
+  const updatedPost = await post.save();
+  res.status(200).json(updatedPost);
 });
 
 // DELETE post
 const deletePost = asyncHandler(async (req, res) => {
-    const post = await Post.findById(req.params.id);
+  const post = await Post.findById(req.params.id);
 
-    if (!post) {
-        res.status(404).json("Post not found.");
-        return;
-    }
+  if (!post) {
+    res.status(404).json("Post not found.");
+    return;
+  }
 
-    if (post.user.toString() !== req.user._id.toString()) {
-        res.status(401).json("Not authorized to delete this post.");
-        return;
-    }
+  if (post.user.toString() !== req.user._id.toString()) {
+    res.status(401).json("Not authorized to delete this post.");
+    return;
+  }
 
-    // Delete attachment files
-    if (post.attachments && post.attachments.length > 0) {
-        post.attachments.forEach(attachmentPath => {
-            try {
-                const filePath = path.join(__dirname, '..', attachmentPath);
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            } catch (error) {
-                console.error("Error removing file:", error);
-            }
-        });
-    }
-
-    await Post.deleteOne({ _id: req.params.id });
-    res.status(200).json({ message: "Post deleted successfully" });
+  await Post.deleteOne({ _id: req.params.id });
+  res.status(200).json({ message: "Post deleted successfully" });
 });
 
 // Routes
-router.post("/", protect, upload.array('attachments', 5), CreatePost);
+router.post("/", protect, CreatePost);
 router.get("/", Read_All_Post);
 router.get("/:id", Read_Single_Post);
-router.patch("/:id", protect, upload.array('attachments', 5), updatePost);
+router.patch("/:id", protect, updatePost);
 router.delete("/:id", protect, deletePost);
 
 module.exports = router;

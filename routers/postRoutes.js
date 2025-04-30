@@ -33,6 +33,14 @@ const CreatePost = asyncHandler(async (req, res) => {
   let processedAttachments = [];
   if (attachments && Array.isArray(attachments)) {
     processedAttachments = attachments.map((att, idx) => {
+      if (att && typeof att === "object" && att.data && att.mimetype) {
+        return {
+          filename: att.filename || `attachment_${Date.now()}_${idx}`,
+          data: att.data,
+          mimetype: att.mimetype,
+        };
+      }
+      // Else, try to parse as Data URI string
       const base64Obj = parseBase64DataUri(att);
       if (!base64Obj) {
         throw new Error("Invalid base64 attachment format");
@@ -43,7 +51,9 @@ const CreatePost = asyncHandler(async (req, res) => {
         mimetype: base64Obj.mimetype,
       };
     });
+    post.attachments = processedAttachments;
   }
+  
 
   const post = await Post.create({
     user: req.user._id,

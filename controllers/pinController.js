@@ -15,7 +15,7 @@ exports.createPin = asyncHandler(async (req, res) => {
 
   const pin = await Pin.create({
     name,
-    location: { type: "Point", coordinates: location },
+    location,
     type,
     description,
     acceptedMaterials,

@@ -23,18 +23,27 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: function (req, file, cb) {
-        // Accept images, PDFs, and common document formats
-        const filetypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        
-        if (mimetype && extname) {
+        const allowedMimes = [
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'image/gif',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain'
+        ];
+        const extname = /\.(jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt)$/i.test(path.extname(file.originalname));
+        if (allowedMimes.includes(file.mimetype) && extname) {
             return cb(null, true);
         }
         cb(new Error("Only supported file formats allowed!"));
     }
+    
 });
 
 // Create Post with attachments

@@ -163,6 +163,62 @@ const updateUser = asyncHandler(async(req,res) => {
     }
 })
 
+// Search users
+router.get('/search', protect, asyncHandler(async (req, res) => {
+  const { query } = req.query;
+  
+  if (!query) {
+    res.status(400).json('Search query is required');
+    return;
+  }
+  
+  // Search by username, email, or phone
+  const users = await User.find({
+    $or: [
+      { username: { $regex: query, $options: 'i' } },
+      { email: { $regex: query, $options: 'i' } },
+      { phone: { $regex: query, $options: 'i' } }
+    ],
+    _id: { $ne: req.user.id } // Exclude the current user
+  }).select('username firstName lastName _id');
+  
+  res.status(200).json(users);
+}));
+
+// Get pending friend requests
+router.get('/friend-requests', protect, asyncHandler(async (req, res) => {
+  const requests = await Friend.find({ 
+    recipient: req.user.id,
+    status: 'pending'
+  }).populate('requester', 'username firstName lastName');
+  
+  res.status(200).json(requests);
+}));
+
+// Get friends list
+router.get('/friends', protect, asyncHandler(async (req, res) => {
+  const friends = await Friend.find({
+    $or: [
+      { requester: req.user.id, status: 'accepted' },
+      { recipient: req.user.id, status: 'accepted' }
+    ]
+  }).populate('requester recipient', 'username firstName lastName');
+  
+  // Format the response to show the friend's info (not the current user)
+  const formattedFriends = friends.map(friend => {
+    const isFriendRequester = friend.requester._id.toString() !== req.user.id;
+    return {
+      _id: friend._id,
+      friend: isFriendRequester ? friend.requester : friend.recipient,
+      status: friend.status,
+      createdAt: friend.createdAt
+    };
+  });
+  
+  res.status(200).json(formattedFriends);
+}));
+
+
 router.post('/register', registerUser)
 router.post('/login', loginUser)
 router.patch("/update/:id", protect, updateUser)

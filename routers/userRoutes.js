@@ -8,6 +8,7 @@ const {protect} = require("../middleware/auth")
 var passwordValidator = require('password-validator');
 const { parsePhoneNumberFromString } = require('libphonenumber-js');
 const validator = require('validator');
+const Friend = require("../models/friend");
 
 var schema = new passwordValidator();
 schema.is().min(8)

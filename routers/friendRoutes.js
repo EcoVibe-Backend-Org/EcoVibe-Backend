@@ -55,7 +55,7 @@ router.delete('/delete/:id', protect, asyncHandler(async (req, res) => {
     return;
   }
 
-  await friendRequest.remove();
+  await Friend.findByIdAndDelete(req.params.id);
   res.status(200).json({ message: 'Friend request deleted' });
 }));
 

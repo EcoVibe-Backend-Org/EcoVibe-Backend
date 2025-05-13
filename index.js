@@ -14,6 +14,7 @@ app.use(errorHandler);
 app.use("/api/users", require("./routers/userRoutes"))
 app.use("/api/comments", require("./routers/CommentRoutes"))
 app.use("/api/posts", require("./routers/postRoutes"))
+app.use("/api/friends", require("./routers/friendRoutes"))
 const mongoose = require("mongoose")
 
 const path = require('path');

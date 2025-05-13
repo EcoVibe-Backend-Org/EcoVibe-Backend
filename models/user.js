@@ -27,6 +27,14 @@ const userSchema = mongoose.Schema({
         type: String,
         required: [true, "Please add a phone number"],
         unique: true
+    },
+    currentPoints: {
+        type: Number,
+        default: 0
+    },
+    totalPoints: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true

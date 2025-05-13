@@ -314,7 +314,44 @@ router.get('/ai-classifications/count/:id', protect, asyncHandler(async (req, re
   
   res.status(200).json({ count });
 }));
+// Get user ranking: global and among friends
+router.get('/rank', protect, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
 
+  // Fetch the current user's totalPoints
+  const currentUser = await User.findById(userId).select('totalPoints');
+  if (!currentUser) {
+    res.status(404).json("User not found");
+    return;
+  }
+
+  // 1. Global rank
+  const higherRankedUsers = await User.countDocuments({ totalPoints: { $gt: currentUser.totalPoints } });
+  const globalRank = higherRankedUsers + 1;
+
+  // 2. Friend rank
+  const friends = await Friend.find({
+    $or: [
+      { requester: userId, status: 'accepted' },
+      { recipient: userId, status: 'accepted' }
+    ]
+  });
+
+  const friendIds = friends.map(f => (
+    f.requester.toString() === userId ? f.recipient : f.requester
+  ));
+  friendIds.push(userId);
+
+  const friendUsers = await User.find({ _id: { $in: friendIds } }).select('totalPoints');
+  const sortedFriends = friendUsers.sort((a, b) => b.totalPoints - a.totalPoints);
+  const friendRank = sortedFriends.findIndex(user => user._id.toString() === userId) + 1;
+
+  res.status(200).json({
+    globalRank,
+    friendRank,
+    totalFriends: sortedFriends.length
+  });
+}));
 
 router.post('/register', registerUser)
 router.post('/login', loginUser)

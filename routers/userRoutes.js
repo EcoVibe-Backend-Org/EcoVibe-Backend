@@ -8,6 +8,10 @@ const {protect} = require("../middleware/auth")
 var passwordValidator = require('password-validator');
 const { parsePhoneNumberFromString } = require('libphonenumber-js');
 const validator = require('validator');
+const Friend = require("../models/friend");
+const Post = require("../models/post");
+const Comment = require("../models/comment");
+const AIimageClassifier = require("../models/AIimageClassifier");
 
 var schema = new passwordValidator();
 schema.is().min(8)
@@ -162,6 +166,192 @@ const updateUser = asyncHandler(async(req,res) => {
         res.status(500)
     }
 })
+
+// Search users
+router.get('/search', protect, asyncHandler(async (req, res) => {
+  const { query } = req.query;
+  
+  if (!query) {
+    res.status(400).json('Search query is required');
+    return;
+  }
+  
+  // Search by username, email, or phone
+  const users = await User.find({
+    $or: [
+      { username: { $regex: query, $options: 'i' } },
+      { email: { $regex: query, $options: 'i' } },
+      { phone: { $regex: query, $options: 'i' } }
+    ],
+    _id: { $ne: req.user.id } // Exclude the current user
+  }).select('username firstName lastName _id');
+  
+  res.status(200).json(users);
+}));
+
+// Get pending friend requests
+router.get('/friend-requests', protect, asyncHandler(async (req, res) => {
+  const requests = await Friend.find({ 
+    recipient: req.user.id,
+    status: 'pending'
+  }).populate('requester', 'username firstName lastName');
+  
+  res.status(200).json(requests);
+}));
+
+// Get friends list
+router.get('/friends', protect, asyncHandler(async (req, res) => {
+  const friends = await Friend.find({
+    $or: [
+      { requester: req.user.id, status: 'accepted' },
+      { recipient: req.user.id, status: 'accepted' }
+    ]
+  }).populate('requester recipient', 'username firstName lastName');
+  
+  // Format the response to show the friend's info (not the current user)
+  const formattedFriends = friends.map(friend => {
+    const isFriendRequester = friend.requester._id.toString() !== req.user.id;
+    return {
+      _id: friend._id,
+      friend: isFriendRequester ? friend.requester : friend.recipient,
+      status: friend.status,
+      createdAt: friend.createdAt
+    };
+  });
+  
+  res.status(200).json(formattedFriends);
+}));
+
+router.get('/points/:id', protect, asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  
+  // Verify the user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404).json('User not found');
+    return;
+  }
+  
+  // Return the user's points
+  // Assuming the User model has a points field. If not, you'll need to add it.
+  res.status(200).json({ points: user.points || 0 });
+}));
+
+// Get user's last 4 activities
+router.get('/recent-activity/:id', protect, asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  
+  // Verify the user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404).json('User not found');
+    return;
+  }
+  
+  // Get the user's recent posts
+  const posts = await Post.find({ user: userId })
+    .sort({ createdAt: -1 })
+    .limit(4)
+    .select('_id title createdAt');
+  
+  // Get the user's recent comments
+  const comments = await Comment.find({ user: userId })
+    .sort({ createdAt: -1 })
+    .limit(4)
+    .select('_id content createdAt post');
+  
+  // Get the user's recent AI image classifications
+  const aiClassifications = await AIimageClassifier.find({ userID: userId })
+    .sort({ createdAt: -1 })
+    .limit(4)
+    .select('_id response createdAt gptModel');
+  
+  // Combine all activities, sort by date, and take the 4 most recent
+  const allActivities = [
+    ...posts.map(post => ({
+      type: 'post',
+      _id: post._id,
+      title: post.title,
+      createdAt: post.createdAt
+    })),
+    ...comments.map(comment => ({
+      type: 'comment',
+      _id: comment._id,
+      content: comment.content,
+      postId: comment.post,
+      createdAt: comment.createdAt
+    })),
+    ...aiClassifications.map(classification => ({
+      type: 'aiClassification',
+      _id: classification._id,
+      response: classification.response,
+      model: classification.gptModel,
+      createdAt: classification.createdAt
+    }))
+  ];
+  
+  // Sort by date and limit to 4
+  const recentActivities = allActivities
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 4);
+  
+  res.status(200).json(recentActivities);
+}));
+
+// Get total number of AI images classified by user
+router.get('/ai-classifications/count/:id', protect, asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  
+  // Verify the user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404).json('User not found');
+    return;
+  }
+  
+  // Count the total number of AI image classifications by this user
+  const count = await AIimageClassifier.countDocuments({ userID: userId });
+  
+  res.status(200).json({ count });
+}));
+// Get user ranking: global and among friends
+router.get('/rank', protect, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  // Fetch the current user's totalPoints
+  const currentUser = await User.findById(userId).select('totalPoints');
+  if (!currentUser) {
+    res.status(404).json("User not found");
+    return;
+  }
+
+  // 1. Global rank
+  const higherRankedUsers = await User.countDocuments({ totalPoints: { $gt: currentUser.totalPoints } });
+  const globalRank = higherRankedUsers + 1;
+
+  // 2. Friend rank
+  const friends = await Friend.find({
+    $or: [
+      { requester: userId, status: 'accepted' },
+      { recipient: userId, status: 'accepted' }
+    ]
+  });
+
+  const friendIds = friends.map(f => (
+    f.requester.toString() === userId ? f.recipient : f.requester
+  ));
+  friendIds.push(userId);
+
+  const friendUsers = await User.find({ _id: { $in: friendIds } }).select('totalPoints');
+  const sortedFriends = friendUsers.sort((a, b) => b.totalPoints - a.totalPoints);
+  const friendRank = sortedFriends.findIndex(user => user._id.toString() === userId) + 1;
+
+  res.status(200).json({
+    globalRank,
+    friendRank,
+    totalFriends: sortedFriends.length
+  });
+}));
 
 router.post('/register', registerUser)
 router.post('/login', loginUser)

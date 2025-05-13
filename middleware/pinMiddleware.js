@@ -21,10 +21,7 @@ exports.validatePinData = (data) => {
     typeof location.coordinates[0] !== "number" ||
     typeof location.coordinates[1] !== "number"
   ) {
-    return {
-      error:
-        "Please add a valid location (GeoJSON: {type: 'Point', coordinates: [lng, lat]})",
-    };
+    return { error: "Please add a valid location (GeoJSON: {type: 'Point', coordinates: [lng, lat]})" };
   }
 
   if (!type || !VALID_TYPES.includes(type)) {

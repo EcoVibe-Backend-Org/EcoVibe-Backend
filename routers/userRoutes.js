@@ -232,9 +232,7 @@ router.get('/points/:id', protect, asyncHandler(async (req, res) => {
     return;
   }
   
-  // Return the user's points
-  // Assuming the User model has a points field. If not, you'll need to add it.
-  res.status(200).json({ points: user.points || 0 });
+  res.status(200).json({ points: user.currentPoints || 0 });
 }));
 
 // Get user's last 4 activities
@@ -352,6 +350,109 @@ router.get('/rank', protect, asyncHandler(async (req, res) => {
     totalFriends: sortedFriends.length
   });
 }));
+
+// GET global leaderboard data
+router.get('/leaderboard/global', protect, asyncHandler(async (req, res) => {
+  const users = await User.find()
+    .select('firstName lastName totalPoints currentPoints')
+    .sort({ totalPoints: -1 })
+    .limit(50);  // Limit to top 50 users for performance
+  
+  res.status(200).json(users);
+}));
+
+// GET friends leaderboard data
+router.get('/leaderboard/friends', protect, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  
+  // Find all accepted friend relationships for the current user
+  const friends = await Friend.find({
+    $or: [
+      { requester: userId, status: 'accepted' },
+      { recipient: userId, status: 'accepted' }
+    ]
+  });
+  
+  // Extract friend IDs
+  const friendIds = friends.map(f => 
+    f.requester.toString() === userId ? f.recipient : f.requester
+  );
+  
+  // Include current user in the list
+  friendIds.push(userId);
+  
+  // Get friend user details with populated data
+  const friendsData = await User.find({ _id: { $in: friendIds } })
+    .select('firstName lastName totalPoints currentPoints')
+    .sort({ totalPoints: -1 });
+  
+  res.status(200).json(friendsData);
+}));
+
+// GET user's detailed stats for leaderboard
+router.get('/leaderboard/stats', protect, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  
+  // Fetch the current user
+  const currentUser = await User.findById(userId).select('totalPoints currentPoints');
+  if (!currentUser) {
+    res.status(404).json("User not found");
+    return;
+  }
+  
+  // Get next rank user's points (global)
+  const nextRankUser = await User.findOne({ 
+    totalPoints: { $gt: currentUser.totalPoints } 
+  }).sort({ totalPoints: 1 }).select('totalPoints');
+  
+  // Get user's position in weekly leaderboard
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  
+  const weeklyRank = await User.countDocuments({ 
+    currentPoints: { $gt: currentUser.currentPoints },
+    updatedAt: { $gte: weekStart }
+  }) + 1;
+  
+  res.status(200).json({
+    totalPoints: currentUser.totalPoints,
+    currentPoints: currentUser.currentPoints,
+    nextRankPoints: nextRankUser ? nextRankUser.totalPoints : currentUser.totalPoints + 100,
+    weeklyRank
+  });
+}));
+
+// GET time-based leaderboard (weekly, monthly, all-time)
+router.get('/leaderboard/:timeframe', protect, asyncHandler(async (req, res) => {
+  const { timeframe } = req.params;
+  let dateFilter = {};
+  let pointsField = 'totalPoints';
+  
+  // Set date filter based on timeframe
+  if (timeframe === 'weekly') {
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    dateFilter = { updatedAt: { $gte: weekStart } };
+    pointsField = 'currentPoints';
+  } else if (timeframe === 'monthly') {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    dateFilter = { updatedAt: { $gte: monthStart } };
+    pointsField = 'currentPoints';
+  }
+  
+  // Query users with the appropriate filter
+  const users = await User.find(dateFilter)
+    .select('firstName lastName totalPoints currentPoints')
+    .sort({ [pointsField]: -1 })
+    .limit(50);
+  
+  res.status(200).json(users);
+}));
+
 
 router.post('/register', registerUser)
 router.post('/login', loginUser)

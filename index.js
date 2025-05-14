@@ -19,6 +19,21 @@ app.use("/api/posts", require("./routers/postRoutes"))
 app.use("/api/friends", require("./routers/friendRoutes"))
 app.use('/api/barcodes', require('./routers/barcodeRoutes'));
 app.use(errorHandler);
+
+const rateLimit = require('express-rate-limit');
+
+// Configure the global rate limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+  standardHeaders: true, // Send RateLimit headers
+  legacyHeaders: false,  // Disable legacy headers
+});
+
+// Apply the limiter to all incoming requests
+app.use(limiter);
+
 const mongoose = require("mongoose")
 
 

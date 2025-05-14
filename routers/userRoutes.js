@@ -453,6 +453,34 @@ router.get('/leaderboard/:timeframe', protect, asyncHandler(async (req, res) => 
   res.status(200).json(users);
 }));
 
+// Award points to a user
+router.post('/award-points/:id', protect, asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const { points } = req.body;
+
+  if (typeof points !== 'number' || points <= 0) {
+    res.status(400).json('Points must be a positive number');
+    return;
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404).json('User not found');
+    return;
+  }
+
+  user.currentPoints += points;
+  user.totalPoints += points;
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Awarded ${points} points to user.`,
+    currentPoints: user.currentPoints,
+    totalPoints: user.totalPoints
+  });
+}));
+
 
 router.post('/register', registerUser)
 router.post('/login', loginUser)

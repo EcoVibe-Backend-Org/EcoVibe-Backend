@@ -232,9 +232,7 @@ router.get('/points/:id', protect, asyncHandler(async (req, res) => {
     return;
   }
   
-  // Return the user's points
-  // Assuming the User model has a points field. If not, you'll need to add it.
-  res.status(200).json({ points: user.points || 0 });
+  res.status(200).json({ points: user.currentPoints || 0 });
 }));
 
 // Get user's last 4 activities

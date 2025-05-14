@@ -40,7 +40,7 @@ app.post("/analyze-image", async (req, res) => {
     const { imageBase64 } = req.body;
     if (!imageBase64)
       return res.status(400).json({ error: "No image provided" });
-    const userID = req.user._id;
+    const userID = req.userId;
     // Get user ID from authenticated session (assuming authentication middleware)
     
 

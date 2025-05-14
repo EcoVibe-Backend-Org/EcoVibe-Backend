@@ -11,11 +11,15 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api/pin", require("./routers/pinRoutes"));
 app.use(errorHandler);
-app.use("/api/users", require("./routers/userRoutes"))
-app.use("/api/comments", require("./routers/CommentRoutes"))
-app.use("/api/posts", require("./routers/postRoutes"))
-app.use("/api/friends", require("./routers/friendRoutes"))
-const mongoose = require("mongoose")
+app.use("/api/users", require("./routers/userRoutes"));
+app.use("/api/comments", require("./routers/CommentRoutes"));
+app.use("/api/posts", require("./routers/postRoutes"));
+app.use("/api/friends", require("./routers/friendRoutes"));
+// New Promo Code and Redemption Routes
+
+app.use("/api/promo", require("./routers/promoRoutes"));
+app.use("/api/redemption", require("./routers/redemptionRoutes"));
+const mongoose = require("mongoose");
 
 const path = require('path');
 app.use('/uploads', express.static('uploads'));
